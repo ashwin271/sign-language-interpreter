@@ -20,11 +20,11 @@ db = []
 
 # User model for Pydantic validation
 class UserCreate(BaseModel):
-    username: str
+    email: str
     password: str
 
 class UserLogin(BaseModel):
-    username: str
+    email: str
     password: str
 
 class Token(BaseModel):
@@ -44,7 +44,7 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain text password against a hashed password."""
-    try:G
+    try:
         return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
         print(f"Error verifying password: {e}")  # Log the error
@@ -63,9 +63,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
 
 
 # Database functions
-def get_user(username: str) -> Optional[dict]:
-    """Find a user by username."""
-    return next((user for user in db if user["username"] == username), None)
+def get_user(email: str) -> Optional[dict]:
+    """Find a user by email."""
+    return next((user for user in db if user["email"] == email), None)
 
 def add_user(user_data: dict) -> None:
     """Add a user to the database."""
@@ -82,15 +82,15 @@ def add_user(user_data: dict) -> None:
 def signup(user: UserCreate):
     """Handle user signup."""
     try:
-        # Check if the username already exists
-        if get_user(user.username):
-            raise HTTPException(status_code=400, detail="Username already exists")
+        # Check if the email already exists
+        if get_user(user.email):
+            raise HTTPException(status_code=400, detail="email already exists")
         
         # Hash the user's password and save the user
         hashed_password = hash_password(user.password)
         
         # Add user to the "database"
-        add_user({"username": user.username, "hashed_password": hashed_password})
+        add_user({"email": user.email, "hashed_password": hashed_password})
 
         return {"message": "User created successfully"}
     
@@ -112,18 +112,18 @@ def login(user: UserLogin):
     """Handle user login."""
     try:
         # Step 1: Check if the user exists
-        db_user = get_user(user.username)
+        db_user = get_user(user.email)
 
         if not db_user:
-            raise HTTPException(status_code=400, detail="Invalid username or password")
+            raise HTTPException(status_code=400, detail="Invalid email or password")
         
         # Step 2: Verify the password
         if not verify_password(user.password, db_user["hashed_password"]):
-            raise HTTPException(status_code=400, detail="Invalid username or password")
+            raise HTTPException(status_code=400, detail="Invalid email or password")
         
         # Step 3: Create the access token
         access_token = create_access_token(
-            data={"sub": user.username},
+            data={"sub": user.email},
             expires_delta=timedelta(minutes=30)
         )
 
