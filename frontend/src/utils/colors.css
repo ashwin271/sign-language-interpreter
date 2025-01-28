@@ -1,0 +1,11 @@
+:root {
+  --primary-color: #a8d8ea;
+  --secondary-color: #aa96da;
+  --background-color: #f3f1f5;
+  --text-color: #2d3436;
+  --error-color: #ff9aa2;
+  --success-color: #98ddca;
+  --input-background: #ffffff;
+  --button-hover: #aa96da;
+}
+
