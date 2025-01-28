@@ -4,3 +4,4 @@ openai-whisper
 python-multipart
 python-jose
 passlib
+bcrypt
