@@ -5,7 +5,7 @@ import './auth.css';
 const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -81,4 +81,3 @@ const Login = () => {
 };
 
 export default Login;
-

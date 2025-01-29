@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Home from './components/home/Home';
+import AudioToText from './components/home/AudioToText'
 import './App.css';
 
 // Protected Route Component
@@ -39,6 +40,15 @@ function App() {
             }
           />
 
+          <Route
+            path="/audio-to-text"
+            element={
+              <ProtectedRoute>
+                <AudioToText />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 404 Route */}
           <Route 
             path="*" 
@@ -51,4 +61,3 @@ function App() {
 }
 
 export default App;
-
