@@ -11,7 +11,7 @@ python -m venv venv
 2. Activate the virtual environment:
 ```shell
 # Windows:
-venv\Scripts\activate
+venv/Scripts/activate
 
 # macOS/Linux:
 source venv/bin/activate
@@ -31,6 +31,8 @@ sudo apt update && sudo apt install ffmpeg
 scoop install ffmpeg 
 ```
 
+5. Ensure `data/clips` and `static/videos` directories exist for video processing.
+
 ## How to run?
 
 1. Go to `/src`
@@ -43,4 +45,10 @@ cd sign-language-interpreter/backend/src
 3. Run main.py
 ```
 python main.py
+```
+
+4. Video generation will use clips from `data/clips` and save outputs in `static/videos`.
+```shell
+# Output videos are stored in:
+backend/static/videos/
 ```
