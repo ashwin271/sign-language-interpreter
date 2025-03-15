@@ -11,14 +11,15 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],  # Allows all headers
 )
-
 # Import routes
 from routes.translator import router as translator_router
+from routes.video_gen import router as video_gen_router
 from routes.auth import router as auth_router
 
 # Include routers
 app.include_router(translator_router)
 app.include_router(auth_router)
+app.include_router(video_gen_router)
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore
