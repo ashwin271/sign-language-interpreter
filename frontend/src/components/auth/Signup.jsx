@@ -19,31 +19,20 @@ const Signup = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    try {
-      const response = await fetch('http://localhost:8000/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        navigate('/login');
-      } else {
-        setError(data.message);
-      }
-    } catch (err) {
-      setError('An error occurred during signup');
+    // Simulate successful signup
+    if (formData.name && formData.email && formData.password) {
+      // Here you can set a flag in localStorage to simulate authentication
+      localStorage.setItem('isAuthenticated', 'true');
+      navigate('/home');
+    } else {
+      setError('Please fill in all fields.');
     }
   };
 

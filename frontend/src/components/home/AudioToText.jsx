@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ReactMic } from 'react-mic';
 import "./home.css";
 
 const AudioToText = () => {
   const [outputText, setOutputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -12,8 +14,7 @@ const AudioToText = () => {
     navigate('/login');
   };
 
-  const handleAudioUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleAudioUpload = async (file) => {
     if (file) {
       setIsLoading(true);
       setOutputText("Processing your audio file...");
@@ -45,6 +46,28 @@ const AudioToText = () => {
     }
   };
 
+  const startRecording = () => {
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+  };
+
+  const onData = (recordedBlob) => {
+    console.log('Received chunk of real-time data:', recordedBlob);
+  };
+
+  const onStop = (recordedBlob) => {
+    console.log('Recorded Blob:', recordedBlob);
+    handleAudioUpload(recordedBlob.blob);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    handleAudioUpload(file);
+  };
+
   return (
     <div className="page-container">
       <nav className="nav-bar">
@@ -65,16 +88,34 @@ const AudioToText = () => {
             id="audio-upload"
             type="file"
             accept="audio/*"
-            onChange={handleAudioUpload}
+            onChange={handleFileChange}
             style={{ display: "none" }}
             disabled={isLoading}
           />
+        </div>
+        <div className="recording-section">
+          <ReactMic
+            record={isRecording}
+            className="sound-wave"
+            onStop={onStop}
+            onData={onData}
+            strokeColor="#000000"
+            backgroundColor="#FF4081"
+          />
+          <div className="recording-controls">
+            <button onClick={startRecording} disabled={isRecording}>
+              Start Recording
+            </button>
+            <button onClick={stopRecording} disabled={!isRecording}>
+              Stop Recording
+            </button>
+          </div>
         </div>
         <div className="output-area">
           {outputText ? (
             <p>{outputText}</p>
           ) : (
-            <p>No output yet. Upload an audio file to convert.</p>
+            <p>No output yet. Upload an audio file or record to convert.</p>
           )}
         </div>
       </div>

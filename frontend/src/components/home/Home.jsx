@@ -1,3 +1,4 @@
+// Home.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './home.css';
@@ -21,9 +22,10 @@ const Home = () => {
         <h1>Welcome, Happy to Help You!</h1>
         <p>What do you need?</p>
         <div className="button-group">
-          <button onClick={() => navigate("/home")}>Text to Video</button>
-          <button onClick={() => navigate("/home")}>Audio to Video</button>
-          <button onClick={() => navigate("/audio-to-text")}>Audio to Text</button>
+          <button onClick={() => navigate('/text-to-speech')}>Text to Speech</button>
+          <button onClick={() => navigate('/speech-to-video')}>Speech to Video</button>
+          <button onClick={() => navigate('/audio-to-text')}>Speech to Text</button>
+          <button onClick={() => navigate('/video-to-speech')}>Video to Speech</button>
         </div>
       </div>
     </div>

@@ -17,27 +17,15 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      const response = await fetch('http://localhost:8000/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        localStorage.setItem('token', data.token);
-        navigate('/home');
-      } else {
-        setError(data.message);
-      }
-    } catch (err) {
-      setError('An error occurred during login');
+    // Simulate successful login
+    if (formData.email && formData.password) {
+      // Here you can set a flag in localStorage to simulate authentication
+      localStorage.setItem('isAuthenticated', 'true');
+      navigate('/home');
+    } else {
+      setError('Please enter both email and password.');
     }
   };
 

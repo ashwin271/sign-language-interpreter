@@ -4,6 +4,9 @@ import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Home from './components/home/Home';
 import AudioToText from './components/home/AudioToText'
+import TextToSpeech from './components/home/TextToSpeech'
+import VideoToSpeech from './components/home/VideoToSpeech'
+import SpeechToVideo from './components/home/SpeechToVideo'
 import './App.css';
 
 // Protected Route Component
@@ -49,6 +52,32 @@ function App() {
             }
           />
 
+          <Route
+            path="/speech-to-video"
+            element={
+              <ProtectedRoute>
+                <SpeechToVideo />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/text-to-speech"
+            element={
+              <ProtectedRoute>
+                <TextToSpeech />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/video-to-speech"
+            element={
+              <ProtectedRoute>
+                <VideoToSpeech />
+              </ProtectedRoute>
+            }
+          />
           {/* 404 Route */}
           <Route 
             path="*" 
