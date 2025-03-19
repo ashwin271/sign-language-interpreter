@@ -33,6 +33,38 @@ scoop install ffmpeg
 
 5. Ensure `data/clips` and `static/videos` directories exist for video processing.
 
+---
+
+## ✅ **Text-to-Speech (TTS) Instructions**
+
+### 1. **TTS Endpoint**
+```
+POST /tts
+```
+
+### 2. **Request Format**
+```json
+{
+    "text": "Hello, welcome to the sign language interpreter."
+}
+```
+
+### 3. **Output**
+- The generated `.wav` audio file will be saved in:
+```
+backend/src/backend/static/audio
+```
+- The server will return the URL to the generated `.wav` file.
+
+✅ **Example Response:**
+```json
+{
+    "audio_url": "http://localhost:8000/static/audio/output_1710801234.wav"
+}
+```
+
+---
+
 ## How to run?
 
 1. Go to `/src`
