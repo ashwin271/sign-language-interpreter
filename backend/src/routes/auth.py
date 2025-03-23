@@ -1,11 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer
 from datetime import timedelta, datetime
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-router = APIRouter()
+# Import database functions
+from database.db import get_user_by_email, create_user, get_all_users
+
+router = APIRouter(prefix="/auth")
 
 # Secret key for JWT (use a more secure one in production)
 SECRET_KEY = "your_secret_key"
@@ -15,10 +19,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Use a list to store users, where each user is a dictionary
-db = []
+# OAuth2 scheme for token validation
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# User model for Pydantic validation
+# User models for Pydantic validation
 class UserCreate(BaseModel):
     email: str
     password: str
@@ -30,6 +34,10 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user: Dict[str, Any]
+
+class UserResponse(BaseModel):
+    email: str
 
 
 # Helper functions for authentication
@@ -54,26 +62,33 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     """Create a new JWT token."""
     try:
         to_encode = data.copy()
-        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
         to_encode.update({"exp": expire})
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     except Exception as e:
         print(f"Error creating JWT token: {e}")  # Log the error
         raise HTTPException(status_code=500, detail="Error creating JWT token")
 
-
-# Database functions
-def get_user(email: str) -> Optional[dict]:
-    """Find a user by email."""
-    return next((user for user in db if user["email"] == email), None)
-
-def add_user(user_data: dict) -> None:
-    """Add a user to the database."""
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    """Validate token and return current user."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
-        db.append(user_data)
-    except Exception as e:
-        print(f"Error adding user to database: {e}")  # Log the error
-        raise HTTPException(status_code=500, detail="Error adding user to database")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    
+    user = get_user_by_email(email)
+    if user is None:
+        raise credentials_exception
+    
+    return user
 
 
 # FastAPI routes
@@ -83,36 +98,39 @@ def signup(user: UserCreate):
     """Handle user signup."""
     try:
         # Check if the email already exists
-        if get_user(user.email):
-            raise HTTPException(status_code=400, detail="email already exists")
+        if get_user_by_email(user.email):
+            raise HTTPException(status_code=400, detail="Email already exists")
         
-        # Hash the user's password and save the user
+        # Hash the user's password
         hashed_password = hash_password(user.password)
         
-        # Add user to the "database"
-        add_user({"email": user.email, "hashed_password": hashed_password})
+        # Add user to the database
+        success = create_user(user.email, hashed_password)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to create user")
 
         return {"message": "User created successfully"}
     
     except HTTPException as http_err:
         print(f"HTTP Exception: {http_err.detail}")  # Log HTTP errors
-        raise HTTPException(status_code=http_err.status_code, detail=http_err.detail)
+        raise
     
     except Exception as e:
         print(f"Error during signup: {e}")  # Log the error in detail
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
-@router.get("/db", response_model=List[dict])
-def get_db():
-    """Get the current state of the database."""
-    return db
+@router.get("/users", response_model=List[dict])
+def get_users():
+    """Get all users (for debugging)."""
+    return get_all_users()
 
 @router.post("/login", response_model=Token)
 def login(user: UserLogin):
     """Handle user login."""
     try:
         # Step 1: Check if the user exists
-        db_user = get_user(user.email)
+        db_user = get_user_by_email(user.email)
 
         if not db_user:
             raise HTTPException(status_code=400, detail="Invalid email or password")
@@ -124,11 +142,26 @@ def login(user: UserLogin):
         # Step 3: Create the access token
         access_token = create_access_token(
             data={"sub": user.email},
-            expires_delta=timedelta(minutes=30)
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         )
 
-        return {"access_token": access_token, "token_type": "bearer"}
+        # Return token and user data (matching frontend expectations)
+        user_data = {"email": db_user["email"]}
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer",
+            "user": user_data
+        }
+    
+    except HTTPException as http_err:
+        print(f"HTTP Exception: {http_err.detail}")  # Log HTTP errors
+        raise
     
     except Exception as e:
-        print(f"Error: {str(e)}")  # Log the error
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        print(f"Error during login: {e}")  # Log the error
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get information about the currently authenticated user."""
+    return {"email": current_user["email"]}

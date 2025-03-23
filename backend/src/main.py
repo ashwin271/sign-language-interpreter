@@ -1,7 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+# Import database initialization
+from database.db import init_db
+
+# Define lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize the database
+    init_db()
+    print("Database initialized")
+    yield
+    # Shutdown: Clean up resources if needed
+    print("Shutting down application")
+
+# Create FastAPI app with lifespan
+app = FastAPI(lifespan=lifespan)
 
 # Enable CORS
 app.add_middleware(
