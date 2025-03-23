@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .confidence {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        .high-confidence {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .low-confidence {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .waiting {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+        .sequence-container {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f8f9fa;
+        }
+        .sequence-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .sequence-list {
+            font-size: 20px;
+            min-height: 30px;
+            padding: 10px;
+        }
+        .sequence-complete {
+            background-color: #d4edda;
+            border-radius: 5px;
+        }
+        .timer {
+            font-size: 14px;
+            margin-top: 10px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gesture Recognition</h1>
+    <video id="video" autoplay></video>
+    <div class="status waiting" id="status-box">Waiting...</div>
+    <div class="confidence" id="confidence">Confidence: 0%</div>
+    
+    <div class="sequence-container">
+        <div class="sequence-title">Gesture Sequence:</div>
+        <div class="sequence-list" id="sequence-display">No gestures recorded yet</div>
+        <div class="timer" id="timer"></div>
+    </div>
+    
+    <script>
+        const video = document.getElementById("video");
+        const statusBox = document.getElementById("status-box");
+        const confidenceDisplay = document.getElementById("confidence");
+        const sequenceDisplay = document.getElementById("sequence-display");
+        const timerDisplay = document.getElementById("timer");
+        let socket;
+        let isConnected = false;
+        let noGestureStartTime = null;
+        let sequenceComplete = false;
+        
+        function connectWebSocket() {
+            socket = new WebSocket("ws://localhost:8000/ws");
+            
+            socket.onopen = () => {
+                console.log("WebSocket connected");
+                isConnected = true;
+            };
+            
+            socket.onclose = () => {
+                console.log("WebSocket disconnected");
+                isConnected = false;
+                statusBox.textContent = "Connection lost. Reconnecting...";
+                statusBox.className = "status waiting";
+                // Try to reconnect after 2 seconds
+                setTimeout(connectWebSocket, 2000);
+            };
+            
+            socket.onerror = (error) => {
+                console.error("WebSocket error:", error);
+            };
+            
+            socket.onmessage = (event) => {
+                const response = JSON.parse(event.data);
+                
+                // Update sequence display
+                if (response.sequence && Array.isArray(response.sequence)) {
+                    if (response.sequence.length === 0) {
+                        sequenceDisplay.textContent = "No gestures recorded yet";
+                        sequenceDisplay.classList.remove("sequence-complete");
+                    } else {
+                        sequenceDisplay.textContent = response.sequence.join(" ");
+                        
+                        // If sequence is complete, highlight it
+                        if (response.sequence_complete) {
+                            sequenceDisplay.classList.add("sequence-complete");
+                            sequenceComplete = true;
+                        } else {
+                            sequenceDisplay.classList.remove("sequence-complete");
+                            sequenceComplete = false;
+                        }
+                    }
+                }
+                
+                // Update current gesture display
+                if (response.gesture === "Waiting...") {
+                    statusBox.textContent = "Waiting for hand...";
+                    statusBox.className = "status waiting";
+                    confidenceDisplay.textContent = "Confidence: 0%";
+                    
+                    // Start timer if we have gestures but no hand is detected
+                    if (response.sequence && response.sequence.length > 0 && !sequenceComplete) {
+                        if (noGestureStartTime === null) {
+                            noGestureStartTime = Date.now();
+                        }
+                        
+                        const elapsedSeconds = Math.floor((Date.now() - noGestureStartTime) / 1000);
+                        const remainingSeconds = Math.max(0, 3 - elapsedSeconds);
+                        
+                        if (remainingSeconds > 0) {
+                            timerDisplay.textContent = `Sequence will complete in ${remainingSeconds} seconds...`;
+                        } else {
+                            timerDisplay.textContent = "";
+                        }
+                    } else {
+                        timerDisplay.textContent = "";
+                    }
+                } else if (response.gesture === "Gesture Unidentified") {
+                    statusBox.textContent = "Gesture Unidentified";
+                    statusBox.className = "status low-confidence";
+                    confidenceDisplay.textContent = `Confidence: ${Math.round(response.confidence * 100)}%`;
+                    noGestureStartTime = null;
+                    timerDisplay.textContent = "";
+                } else {
+                    statusBox.textContent = response.gesture;
+                    statusBox.className = "status high-confidence";
+                    confidenceDisplay.textContent = `Confidence: ${Math.round(response.confidence * 100)}%`;
+                    noGestureStartTime = null;
+                    timerDisplay.textContent = "";
+                }
+            };
+        }
+        
+        // Initialize webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                connectWebSocket();
+            })
+            .catch(err => {
+                console.error("Error accessing webcam:", err);
+                statusBox.textContent = "Error: Cannot access webcam";
+            });
+        
+        // Send frames to server
+        setInterval(() => {
+            if (!isConnected || !video.srcObject) return;
+            
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Send the frame as base64 image
+            const imageData = canvas.toDataURL("image/jpeg", 0.7);
+            socket.send(imageData);
+        }, 100);  // Send every 100ms (10 frames per second)
+    </script>
+</body>
+</html>

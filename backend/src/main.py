@@ -12,15 +12,17 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 # Import routes
-from routes.translator import router as translator_router
-from routes.video_gen import router as video_gen_router
-from routes.auth import router as auth_router
+#from routes.translator import router as translator_router
+#from routes.video_gen import router as video_gen_router
+#from routes.auth import router as auth_router
+from routes.gesture_recognition import router as gesture_router
 
 # Include routers
-app.include_router(translator_router)
-app.include_router(auth_router)
-app.include_router(video_gen_router)
+#app.include_router(translator_router)
+#app.include_router(auth_router)
+#app.include_router(video_gen_router)
+app.include_router(gesture_router)
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore
-    uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
