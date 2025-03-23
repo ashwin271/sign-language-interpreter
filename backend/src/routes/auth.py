@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 # Import database functions
 from database.db import get_user_by_email, create_user, get_all_users
 
-router = APIRouter(prefix="/auth")
+router = APIRouter()
 
 # Secret key for JWT (use a more secure one in production)
 SECRET_KEY = "your_secret_key"

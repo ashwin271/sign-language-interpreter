@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+
+const API_URL = import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const TextToSign = () => {
   const { theme } = useTheme();
@@ -7,6 +9,34 @@ const TextToSign = () => {
   const [videoUrl, setVideoUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [contentHash, setContentHash] = useState('');
+  const [processingStatus, setProcessingStatus] = useState('');
+
+  // Poll for video status if we're processing
+  useEffect(() => {
+    let intervalId;
+    
+    if (contentHash && processingStatus === 'processing') {
+      intervalId = setInterval(async () => {
+        try {
+          const response = await fetch(`${API_URL}/video/status/${contentHash}`);
+          const data = await response.json();
+          
+          if (data.status === 'completed') {
+            setProcessingStatus('completed');
+            setVideoUrl(`${API_URL}${data.video_path}`);
+            clearInterval(intervalId);
+          }
+        } catch (err) {
+          console.error('Error checking video status:', err);
+        }
+      }, 2000); // Check every 2 seconds
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [contentHash, processingStatus]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,15 +48,18 @@ const TextToSign = () => {
     
     setLoading(true);
     setError('');
+    setVideoUrl('');
+    setContentHash('');
+    setProcessingStatus('');
     
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('http://your-backend-api/text-to-sign', {
+      // Send text as a query parameter in the URL
+      const encodedText = encodeURIComponent(text);
+      const response = await fetch(`${API_URL}/video/?text=${encodedText}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'accept': 'application/json',
         },
-        body: JSON.stringify({ text }),
       });
       
       if (!response.ok) {
@@ -34,7 +67,15 @@ const TextToSign = () => {
       }
       
       const data = await response.json();
-      setVideoUrl(data.videoUrl);
+      
+      if (data.status === 'processing') {
+        // Video is being generated in the background
+        setContentHash(data.content_hash);
+        setProcessingStatus('processing');
+      } else if (data.video_path) {
+        // Video was already cached
+        setVideoUrl(`${API_URL}${data.video_path}`);
+      }
     } catch (err) {
       console.error('Error converting text to sign:', err);
       setError('Failed to convert text to sign language. Please try again.');
@@ -100,6 +141,19 @@ const TextToSign = () => {
         </form>
       </div>
       
+      {processingStatus === 'processing' && (
+        <div className={`p-6 rounded-lg mb-8 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+          <div className="flex flex-col items-center justify-center">
+            <svg className="animate-spin mb-4 h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-lg font-medium">Generating sign language video...</p>
+            <p className="text-sm mt-2">This may take a few moments.</p>
+          </div>
+        </div>
+      )}
+      
       {videoUrl && (
         <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
           <h2 className="text-xl font-semibold mb-4">Sign Language Video</h2>
@@ -125,6 +179,21 @@ const TextToSign = () => {
               </svg>
               Download Video
             </a>
+            
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(text);
+                alert('Text copied to clipboard!');
+              }}
+              className={`px-4 py-2 rounded-lg ${
+                theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+              } transition flex items-center`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy Text
+            </button>
           </div>
         </div>
       )}

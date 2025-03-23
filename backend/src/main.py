@@ -1,9 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
 
 # Import database initialization
 from database.db import init_db
+
+# Define project root and asset directories
+PROJECT_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).parent
+ASSETS_DIR = PROJECT_ROOT / "assets"
+GENERATED_DIR = ASSETS_DIR / "generated"
+
+# Ensure directories exist
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 
 # Define lifespan context manager
 @asynccontextmanager
@@ -26,6 +38,10 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Mount static directories for serving video files
+app.mount("/assets/generated", StaticFiles(directory=str(GENERATED_DIR)), name="generated_videos")
+
 # Import routes
 from routes.translator import router as translator_router
 from routes.video_gen import router as video_gen_router
