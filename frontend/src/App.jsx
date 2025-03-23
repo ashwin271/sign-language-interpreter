@@ -9,6 +9,7 @@ import TextToSign from './components/features/TextToSign';
 import SpeechToSign from './components/features/SpeechToSign';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
+import Dashboard from './components/dashboard/Dashboard'
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Protected route component
@@ -36,6 +37,11 @@ function AppContent() {
           <Route path="/signup" element={<Signup />} />
           
           {/* Protected Routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/sign-to-text" element={
             <ProtectedRoute>
               <SignToText />
