@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Signup = () => {
   const { theme } = useTheme();
+  const { signup, error: authError, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -11,7 +13,6 @@ const Signup = () => {
     password: '',
     confirmPassword: '',
   });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
@@ -29,35 +30,21 @@ const Signup = () => {
       return;
     }
     
-    setLoading(true);
-    
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('http://your-backend-api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        }),
+      // Use the signup function from AuthContext
+      const success = await signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Signup failed');
+      if (success) {
+        // Redirect to login page
+        navigate('/login', { state: { message: 'Account created successfully! Please log in.' } });
       }
-      
-      // Redirect to login page
-      navigate('/login', { state: { message: 'Account created successfully! Please log in.' } });
     } catch (err) {
       console.error('Signup error:', err);
       setError(err.message || 'Failed to create account. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -72,9 +59,9 @@ const Signup = () => {
       
       <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
         <form onSubmit={handleSubmit}>
-          {error && (
+          {(error || authError) && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
-              {error}
+              {error || authError}
             </div>
           )}
           
@@ -162,14 +149,14 @@ const Signup = () => {
           
           <button
             type="submit"
-            disabled={loading}
+            disabled={authLoading}
             className={`w-full px-4 py-3 rounded-lg text-white font-medium ${
-              loading
+              authLoading
                 ? 'bg-gray-400 cursor-not-allowed'
                 : theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
             } transition`}
           >
-            {loading ? (
+            {authLoading ? (
               <span className="flex items-center justify-center">
                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

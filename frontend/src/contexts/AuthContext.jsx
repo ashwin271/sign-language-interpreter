@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -18,8 +19,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       try {
-        // Replace with your actual API endpoint
-        const response = await fetch('http://your-backend-api/auth/me', {
+        const response = await fetch(`${API_URL}/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -48,8 +48,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('http://your-backend-api/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,8 +78,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('http://your-backend-api/auth/signup', {
+      const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
