@@ -5,3 +5,6 @@ python-multipart
 python-jose
 passlib
 bcrypt
+torch
+torchaudio
+base64
