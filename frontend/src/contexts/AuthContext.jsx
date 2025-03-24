@@ -30,7 +30,8 @@ export const AuthProvider = ({ children }) => {
         }
         
         const data = await response.json();
-        setUser(data.user);
+        // The backend returns the user data directly, not nested in a 'user' property
+        setUser(data);
       } catch (err) {
         console.error('Auth check error:', err);
         localStorage.removeItem('token');
