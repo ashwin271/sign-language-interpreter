@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #camera-feed {
+            width: 640px;
+            height: 480px;
+            margin: 20px auto;
+            border: 2px solid #ccc;
+            display: block;
+        }
+        #translation-container {
+            margin-top: 20px;
+            font-size: 1.5em;
+            color: #333;
+        }
+        #start-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #start-button:hover {
+            background-color: #45A049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sign Language Translator</h1>
+    <video id="camera-feed" autoplay muted></video>
+    <div id="translation-container">
+        <p>Real-time Translation: <span id="translated-text">Waiting...</span></p>
+    </div>
+    <button id="start-button">Start Translation</button>
+
+    <script>
+        let ws;
+        const cameraFeed = document.getElementById("camera-feed");
+        const translatedText = document.getElementById("translated-text");
+        const startButton = document.getElementById("start-button");
+    
+        let stream; // Camera stream object
+        
+        async function startTranslation() {
+            try {
+                // Access the webcam
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                cameraFeed.srcObject = stream;
+                
+                // Connect to WebSocket
+                ws = new WebSocket("ws://127.0.0.1:8000/gesture/ws");
+    
+                ws.onopen = () => {
+                    console.log("Connected to WebSocket");
+                    // Start sending frames once connection is open
+                    startSendingFrames();
+                };
+    
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log("WebSocket message received:", data);
+    
+                    // Update the translation text
+                    if (data.text) {
+                        translatedText.innerText = data.text;
+                    }
+                };
+    
+                ws.onerror = (error) => {
+                    console.error("WebSocket error:", error);
+                    alert("WebSocket connection error. Check console for details.");
+                };
+    
+                ws.onclose = () => {
+                    console.log("WebSocket connection closed");
+                };
+            } catch (err) {
+                console.error("Error starting translation:", err);
+                alert("Unable to access camera or connect to WebSocket.");
+            }
+        }
+    
+        function startSendingFrames() {
+            // Send video frames to WebSocket
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const fps = 10; // Reduced frame rate for better reliability
+    
+            // Make sure video is ready and has dimensions
+            if (cameraFeed.videoWidth === 0) {
+                console.log("Video not ready yet, waiting...");
+                cameraFeed.addEventListener('loadedmetadata', startSendingFrames);
+                return;
+            }
+    
+            console.log(`Video dimensions: ${cameraFeed.videoWidth}x${cameraFeed.videoHeight}`);
+    
+            const sendFrame = () => {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    console.log("WebSocket not open, stopping frame sending");
+                    return;
+                }
+    
+                try {
+                    canvas.width = cameraFeed.videoWidth;
+                    canvas.height = cameraFeed.videoHeight;
+                    ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+                    
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            console.log(`Sending frame: ${blob.size} bytes`);
+                            ws.send(blob);
+                        } else {
+                            console.error("Failed to create blob from canvas");
+                        }
+                        // Schedule next frame after this one is processed
+                        setTimeout(sendFrame, 1000 / fps);
+                    }, "image/jpeg", 0.8);
+                } catch (error) {
+                    console.error("Error sending frame:", error);
+                    setTimeout(sendFrame, 1000 / fps);
+                }
+            };
+    
+            // Start the frame sending process
+            sendFrame();
+            console.log("Started sending frames");
+        }
+    
+        // Start translation when the button is clicked
+        startButton.addEventListener("click", () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                startTranslation();
+            } else {
+                alert("Translation already started.");
+            }
+        });
+    
+        // Cleanup resources when page is unloaded
+        window.addEventListener("beforeunload", () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>
