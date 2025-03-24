@@ -1,86 +1,158 @@
-# Backend server
+# Backend Server for Sign Language Interpreter
 
-## How to install dependencies?
+This backend server provides APIs for sign language interpretation, text-to-speech conversion, and gesture recognition.
 
-1. Create virtual environment
+## Setup Instructions
+
+### 1. Set Up Python Environment
+
+#### Option A: Using Conda (Recommended)
+
 ```shell
-cd path/to/your/project
-python -m venv venv
+# Create a new conda environment with Python 3.12
+conda create -n sign-lang python=3.12
+
+# Activate the environment
+conda activate sign-lang
 ```
 
-2. Activate the virtual environment:
-```shell
-# Windows:
-venv/Scripts/activate
+#### Option B: Using venv
 
-# macOS/Linux:
+```shell
+# Create a new virtual environment
+python -m venv venv
+
+# Activate the environment
+# On Windows
+venv\Scripts\activate
+# On macOS/Linux
 source venv/bin/activate
 ```
 
-3. Pip install dependencies
+### 2. Install Dependencies
+
 ```shell
+# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-4. Install ffmpeg
+### 3. Install FFmpeg
+
+FFmpeg is required for video processing:
+
 ```shell
 # on Ubuntu or Debian
 sudo apt update && sudo apt install ffmpeg
 
-# on Windows using Scoop (install scoop from this link https://scoop.sh/)
+# on macOS with Homebrew
+brew install ffmpeg
+
+# on Windows using Scoop (install scoop from https://scoop.sh/)
 scoop install ffmpeg 
+
+# on Windows using Chocolatey (install chocolatey from https://chocolatey.org/)
+choco install ffmpeg
 ```
 
-5. Ensure `data/clips` and `static/videos` directories exist for video processing.
+### 4. Train Gesture Recognition Model 
 
----
+To train your own gesture recognition model:
 
-## ✅ **Text-to-Speech (TTS) Instructions**
-
-### 1. **TTS Endpoint**
-```
-POST /tts
-```
-
-### 2. **Request Format**
-```json
-{
-    "text": "Hello, welcome to the sign language interpreter."
-}
-```
-
-### 3. **Output**
-- The generated `.wav` audio file will be saved in:
-```
-backend/src/backend/static/audio
-```
-- The server will return the URL to the generated `.wav` file.
-
-✅ **Example Response:**
-```json
-{
-    "audio_url": "http://localhost:8000/static/audio/output_1710801234.wav"
-}
-```
-
----
-
-## How to run?
-
-1. Go to `/src`
-```
-cd sign-language-interpreter/backend/src
-```
-
-2. Activate virtual environment
-
-3. Run main.py
-```
-python main.py
-```
-
-4. Video generation will use clips from `data/clips` and save outputs in `static/videos`.
 ```shell
-# Output videos are stored in:
-backend/static/videos/
+# Activate your environment
+# For conda
+conda activate sign-lang
+# For venv (Windows)
+venv\Scripts\activate
+# For venv (macOS/Linux)
+source venv/bin/activate
+
+# Run the training script
+python src/train_gesture.py
 ```
+
+During training:
+- You'll be prompted to enter gesture names
+- For each gesture, perform the sign in front of your webcam
+- The system will collect 100 samples per gesture
+- Press 'q' to stop collection early
+- Type 'exit' when you've finished adding all gestures
+
+The trained model will be saved in the `model` directory.
+
+>**Note:** For detailed instructions on training, including GPU requirements and troubleshooting, see [TRAIN.md](TRAIN.md).
+
+### 5. Directory Structure
+
+This will be your directory structure after running the backend once:
+
+```py
+backend/
+├── assets
+│   ├── clips
+│   │   └── <word_name>.mp4 # here clips are stored with file name as the word name
+│   └── generated
+│       ├── metadata.json # metadata of generated videos
+│       └── video_b2489a92199c126ce1dd899bb3fdf3d1.mp4 # generated videos
+├── config.json # kokoro config
+├── data
+│   └── db
+│       └── app.db # sqlite db file
+├── kokoro-v1_0.pth # kokoro model
+├── model # gesture recognition model files
+│   ├── gesture_data.npy
+│   ├── gesture_label_map.npy
+│   ├── gesture_labels.npy
+│   └── gesture_model.h5
+├── outputs 
+│   └── <generated_audio>.wav # tts model outputs
+├── README.md
+├── requirements.txt
+├── src
+│   ├── database
+│   │   └── db.py
+│   ├── main.py
+│   ├── routes 
+│   │   ├── auth.py
+│   │   ├── gesture_recognition.py
+│   │   ├── __init__.py
+│   │   ├── transcription.py
+│   │   ├── tts.py
+│   │   ├── utils.py
+│   │   └── video_gen.py
+│   └── train_gesture.py # gesture recognition model training 
+├── test
+│   ├── gesture.html
+│   └── gesture_test.html
+├── TRAIN.md # info on training gesture recognition model
+└── voices # kokoro voices
+    └── zf_xiaoyi.pt 
+```
+
+## Running the Server
+
+```shell
+# Activate your environment
+# For conda
+conda activate sign-lang
+# For venv (Windows)
+venv\Scripts\activate
+# For venv (macOS/Linux)
+source venv/bin/activate
+
+# Navigate to the backend directory
+cd backend
+
+# Run the server
+python src/main.py
+```
+
+The server will start on http://127.0.0.1:8000
+
+
+## Troubleshooting
+
+- **Model Training Issues**: Ensure your webcam is working properly and well-lit for gesture recognition training.
+- **Video Generation**: Check that the `assets/clips` directory contains video clips for the words you're trying to generate.
+- **FFmpeg Errors**: Verify FFmpeg is correctly installed and accessible in your PATH.
+- **Environment Issues**: If you encounter environment-related errors, try creating a fresh environment and reinstalling dependencies.

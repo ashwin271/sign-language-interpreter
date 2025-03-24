@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -7,21 +7,51 @@ import base64
 import json
 import os
 import time
+from typing import List, Dict, Optional
 
-router = FastAPI()
+# Configure TensorFlow to use less GPU memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Limit TensorFlow to only use a fraction of GPU memory
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print("GPU memory growth enabled")
+    except RuntimeError as e:
+        print(f"GPU configuration error: {e}")
+
+# Create router instead of app
+from fastapi import APIRouter
+
+router = APIRouter()
 
 # Load trained model with path relative to the routes directory
-
 # Get the absolute path to the backend directory
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Define paths relative to backend directory
 model_path = os.path.join(backend_dir, "model", "gesture_model.h5")
 label_map_path = os.path.join(backend_dir, "model", "gesture_label_map.npy")
 labels_path = os.path.join(backend_dir, "model", "gesture_labels.npy")
 
-# Load the model
-model = tf.keras.models.load_model(model_path)
+# Load the model and convert to TFLite
+print(f"Loading model from {model_path}")
+keras_model = tf.keras.models.load_model(model_path)
+
+# Convert model to TensorFlow Lite for better performance and lower memory usage
+converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_content=tflite_model)
+interpreter.allocate_tensors()
+
+# Get input and output tensors
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+print(f"Model loaded and converted to TFLite. Input shape: {input_details[0]['shape']}, Output shape: {output_details[0]['shape']}")
 
 # Load label map
 if os.path.exists(label_map_path):
@@ -48,72 +78,55 @@ else:
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.5)
 
+# Constants
+GESTURE_HOLD_TIME = 1.0  # Time in seconds to hold a gesture before adding to sequence
+
 @router.get("/")
 def read_root():
     return {"message": "Gesture Recognition API is running. Connect to /ws with WebSocket."}
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    print("WebSocket Connection Established")
+@router.post("/process-video")
+async def process_video(video: UploadFile = File(...)):
+    """Process an uploaded video file for sign language recognition"""
+    if not video.filename.endswith(('.mp4', '.avi', '.mov', '.webm')):
+        raise HTTPException(status_code=400, detail="Invalid video format. Please upload MP4, AVI, MOV, or WEBM file.")
     
-    # Print the label map to debug
-    print(f"Using label map: {label_map}")
-    print(f"Number of classes in model: {model.output_shape[1]}")
+    # Save the uploaded file temporarily
+    temp_file = f"/tmp/{video.filename}"
+    with open(temp_file, "wb") as buffer:
+        buffer.write(await video.read())
     
-    # Verify model output matches label map
-    if model.output_shape[1] != len(label_map):
-        print(f"Warning: Model has {model.output_shape[1]} output classes, but label map has {len(label_map)} entries!")
-
-    # Variables for tracking gesture sequence
-    gesture_sequence = []
-    last_gesture = None
-    last_gesture_time = time.time()
-    current_gesture_start_time = None
-    no_gesture_start_time = None
-    sequence_complete = False
-    
-    # Minimum time a gesture needs to be held (in seconds) - reduced to 0.25
-    GESTURE_HOLD_TIME = 0.25
-
     try:
-        while True:
-            try:
-                data = await websocket.receive_text()
-            except WebSocketDisconnect:
-                print("Client disconnected")
+        # Process the video
+        cap = cv2.VideoCapture(temp_file)
+        
+        if not cap.isOpened():
+            raise HTTPException(status_code=500, detail="Failed to open video file")
+        
+        # Variables for tracking gesture sequence
+        gesture_sequence: List[str] = []
+        last_gesture: Optional[str] = None
+        gesture_counts: Dict[str, int] = {}
+        
+        # Process frames
+        frame_count = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
                 break
-
-            if "," not in data:
-                continue  # Skip invalid data
-            
-            _, img_data = data.split(",", 1)  # Handle base64 data properly
-            img_data = base64.b64decode(img_data)
-            np_arr = np.frombuffer(img_data, np.uint8)
-            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-            if frame is None:
+                
+            # Process every 5th frame to reduce computation
+            if frame_count % 5 != 0:
+                frame_count += 1
                 continue
-
-            current_time = time.time()
+                
+            # Process the frame
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands.process(frame_rgb)
             
-            # Process frame
-            frame = cv2.flip(frame, 1)
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            result = hands.process(rgb_frame)
-
-            gesture_detected = False
-            response = {
-                "gesture": "Waiting...", 
-                "confidence": 0.0, 
-                "mode": "recording",
-                "sequence": gesture_sequence,
-                "sequence_complete": sequence_complete
-            }
-
-            if result.multi_hand_landmarks:
-                for hand_landmarks in result.multi_hand_landmarks:
-                    # Extract landmarks in the correct format
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    # Extract landmarks
                     landmarks = []
                     for lm in hand_landmarks.landmark:
                         landmarks.extend([lm.x, lm.y])  # Store x, y
@@ -122,10 +135,105 @@ async def websocket_endpoint(websocket: WebSocket):
                     if len(landmarks) != 42:
                         continue
                         
-                    landmarks = np.array(landmarks).reshape(1, -1)
+                    landmarks = np.array(landmarks).reshape(1, -1).astype(np.float32)
 
-                    # Get predictions
-                    prediction = model.predict(landmarks, verbose=0)
+                    # Get predictions using TFLite
+                    interpreter.set_tensor(input_details[0]['index'], landmarks)
+                    interpreter.invoke()
+                    prediction = interpreter.get_tensor(output_details[0]['index'])
+                    
+                    gesture_id = int(np.argmax(prediction))
+                    confidence = float(prediction[0][gesture_id])
+                    
+                    # Get gesture name from the label map
+                    gesture_name = label_map.get(gesture_id, "Unknown")
+                    
+                    if confidence > 0.6 and gesture_name != "Unknown":
+                        # Count occurrences of each gesture
+                        if gesture_name not in gesture_counts:
+                            gesture_counts[gesture_name] = 0
+                        gesture_counts[gesture_name] += 1
+            
+            frame_count += 1
+        
+        cap.release()
+        
+        # Determine the most frequent gestures
+        for gesture, count in sorted(gesture_counts.items(), key=lambda x: x[1], reverse=True):
+            if count > 5:  # Threshold to consider a gesture valid
+                gesture_sequence.append(gesture)
+        
+        # Clean up the temporary file
+        os.remove(temp_file)
+        
+        return {
+            "text": " ".join(gesture_sequence),
+            "sequence": gesture_sequence
+        }
+        
+    except Exception as e:
+        # Clean up the temporary file if it exists
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("WebSocket connection accepted")
+    
+    # Variables for tracking gesture sequence
+    gesture_sequence: List[str] = []
+    last_gesture: Optional[str] = None
+    current_gesture_start_time: Optional[float] = None
+    no_gesture_start_time: Optional[float] = None
+    last_gesture_time: float = time.time()
+    sequence_complete: bool = False
+    
+    try:
+        while True:
+            # Receive frame from client
+            data = await websocket.receive_bytes()
+            
+            # Convert bytes to numpy array
+            nparr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if frame is None:
+                continue
+                
+            # Process the frame
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = hands.process(frame_rgb)
+            
+            current_time = time.time()
+            gesture_detected = False
+            
+            response = {
+                "gesture": "Waiting...",
+                "confidence": 0.0,
+                "sequence": gesture_sequence,
+                "text": " ".join(gesture_sequence) if gesture_sequence else ""
+            }
+            
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    # Extract landmarks
+                    landmarks = []
+                    for lm in hand_landmarks.landmark:
+                        landmarks.extend([lm.x, lm.y])  # Store x, y
+                    
+                    # Ensure we have the correct number of landmarks
+                    if len(landmarks) != 42:
+                        continue
+                        
+                    landmarks = np.array(landmarks).reshape(1, -1).astype(np.float32)
+
+                    # Get predictions using TFLite
+                    interpreter.set_tensor(input_details[0]['index'], landmarks)
+                    interpreter.invoke()
+                    prediction = interpreter.get_tensor(output_details[0]['index'])
+                    
                     gesture_id = int(np.argmax(prediction))
                     confidence = float(prediction[0][gesture_id])
                     
@@ -146,9 +254,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         response = {
                             "gesture": gesture_name,
                             "confidence": round(confidence, 2),
-                            "mode": "recording",
                             "sequence": gesture_sequence,
-                            "sequence_complete": sequence_complete
+                            "text": " ".join(gesture_sequence) if gesture_sequence else ""
                         }
                         
                         # Handle the gesture timing
@@ -159,7 +266,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         elif current_gesture_start_time is not None:
                             # Same gesture continued
                             if (current_time - current_gesture_start_time >= GESTURE_HOLD_TIME and 
-                                gesture_name != "Gesture Unidentified" and
+                                gesture_name != "Unknown" and
                                 (not gesture_sequence or gesture_sequence[-1] != gesture_name)):
                                 # Gesture held long enough, add to sequence if not already the last one
                                 print(f"Adding {gesture_name} to sequence (held for {current_time - current_gesture_start_time:.2f}s)")
@@ -172,11 +279,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         last_gesture_time = current_time
                     else:
                         response = {
-                            "gesture": "Gesture Unidentified",
+                            "gesture": "Unknown",
                             "confidence": round(confidence, 2),
-                            "mode": "recording",
                             "sequence": gesture_sequence,
-                            "sequence_complete": sequence_complete
+                            "text": " ".join(gesture_sequence) if gesture_sequence else ""
                         }
 
             # If no gesture is detected for 3 seconds and we have gestures in the sequence, mark sequence as complete
@@ -191,8 +297,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     response = {
                         "gesture": "Waiting...",
                         "confidence": 0.0,
-                        "mode": "recording",
                         "sequence": gesture_sequence,
+                        "text": " ".join(gesture_sequence) if gesture_sequence else "",
                         "sequence_complete": True
                     }
                     
@@ -202,11 +308,12 @@ async def websocket_endpoint(websocket: WebSocket):
             
             await websocket.send_text(json.dumps(response))
 
+    except WebSocketDisconnect:
+        print("Client disconnected")
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
-
     finally:
         print("WebSocket Connection Closed")
-        await websocket.close()
+        # Don't try to close the connection here, it's already closed

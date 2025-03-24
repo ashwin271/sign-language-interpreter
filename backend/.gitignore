@@ -1,2 +1,9 @@
 __pycache__
 *.wav
+*.db
+assets
+.cache
+voices
+config.json
+*.pth
+outputs
