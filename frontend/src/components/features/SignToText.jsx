@@ -146,41 +146,84 @@ const SignToText = () => {
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto text-center p-6">
-      <h1 className="text-3xl font-bold mb-4">Sign Language Translator</h1>
-      
-      <div className={`aspect-video max-w-2xl mx-auto rounded-lg overflow-hidden ${
-        theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
-      } mb-6 border-2 border-gray-300`}>
-        <video 
-          ref={videoRef}
-          autoPlay 
-          muted
-          className="w-full h-full object-cover"
-        />
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold mb-4">Sign Language Translator</h1>
+        <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}>
+          Use your webcam to translate sign language to text in real-time.
+        </p>
       </div>
       
-      <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-        <h3 className="text-lg font-semibold mb-2">Real-time Translation</h3>
-        <p className="text-xl">{realtimeResult}</p>
-      </div>
-      
-      {error && (
-        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg mb-6">
-          {error}
+      <div className={`p-6 rounded-lg mb-8 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+        <h2 className="text-xl font-semibold mb-4">Real-time Translation</h2>
+        
+        <div className={`aspect-video max-w-2xl mx-auto rounded-lg overflow-hidden ${
+          theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'
+        } mb-6 border-2 border-gray-300`}>
+          <video 
+            ref={videoRef}
+            autoPlay 
+            muted
+            className="w-full h-full object-cover"
+          />
         </div>
-      )}
-      
-      <button
-        onClick={isRealtime ? stopTranslation : startTranslation}
-        className={`px-6 py-3 rounded-lg text-white font-medium ${
-          isRealtime 
-            ? 'bg-red-600 hover:bg-red-700' 
-            : theme === 'dark' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'
-        } transition`}
-      >
-        {isRealtime ? 'Stop Translation' : 'Start Translation'}
-      </button>
+        
+        <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+          <p className="text-xl">{realtimeResult}</p>
+        </div>
+        
+        {error && (
+          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+        
+        <div className="flex justify-center">
+          <button
+            onClick={isRealtime ? stopTranslation : startTranslation}
+            className={`px-6 py-3 rounded-lg text-white font-medium ${
+              isRealtime 
+                ? 'bg-red-600 hover:bg-red-700' 
+                : theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+            } transition`}
+          >
+            {isRealtime ? 'Stop Translation' : 'Start Translation'}
+          </button>
+        </div>
+        
+        {isRealtime && realtimeResult && realtimeResult !== 'Waiting...' && (
+          <div className="mt-4 flex gap-4 justify-center">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(realtimeResult);
+              }}
+              className={`px-4 py-2 rounded-lg ${
+                theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+              } transition flex items-center`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy Text
+            </button>
+            
+            <button
+              onClick={() => {
+                const speech = new SpeechSynthesisUtterance(realtimeResult);
+                window.speechSynthesis.speak(speech);
+              }}
+              className={`px-4 py-2 rounded-lg ${
+                theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+              } text-white transition flex items-center`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+              </svg>
+              Speak Text
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
