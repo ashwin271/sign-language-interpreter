@@ -18,3 +18,4 @@ numpy
 h5py
 scikit-learn
 websockets
+kokoro

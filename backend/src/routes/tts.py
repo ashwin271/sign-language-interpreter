@@ -1,18 +1,15 @@
-from fastapi import APIRouter
-
-# Create a router instance
-router = APIRouter()
-
-from fastapi import FastAPI, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 import uvicorn
 import torch
 import os
 import torchaudio
-from utils import build_model, generate_speech
+from .utils import build_model, generate_speech
 import base64
+import scipy.io.wavfile as wavfile
 
-app = FastAPI()
+# Create a router instance
+router = APIRouter()
 
 # Create output directory if it doesn't exist
 OUTPUT_DIR = "outputs"
@@ -24,7 +21,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # Initialize Kokoro TTS model
 model = build_model(None, DEVICE)
 
-@app.post("/tts")
+@router.post("/convert")
 async def tts(
     text: str = Query(..., description="Text to convert to speech"),
     voice: str = Query("af_bella", description="Voice model to use (e.g., af_bella, am_adam)"),
@@ -39,9 +36,13 @@ async def tts(
         if audio_tensor is None:
             return JSONResponse(status_code=500, content={"error": "Failed to generate speech"})
 
-        # Save audio as WAV file
+        # Convert the audio tensor to numpy array
+        audio_numpy = audio_tensor.cpu().numpy()
+        
+        # Save audio as WAV file using scipy instead of torchaudio
+
         output_path = os.path.join(OUTPUT_DIR, "output.wav")
-        torchaudio.save(output_path, audio_tensor.unsqueeze(0), 24000)
+        wavfile.write(output_path, 24000, audio_numpy)
 
         # Convert the audio to Base64
         with open(output_path, "rb") as audio_file:
@@ -55,5 +56,3 @@ async def tts(
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

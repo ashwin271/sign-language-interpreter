@@ -29,15 +29,14 @@ VOICE_FILES = [
     # British Male voices
     "bm_daniel.pt", "bm_fable.pt", "bm_george.pt", "bm_lewis.pt",
     # Special voices
-    "el_dora.pt", "em_alex.pt", "em_santa.pt",
+    "em_alex.pt", "em_santa.pt",
     "ff_siwis.pt",
     "hf_alpha.pt", "hf_beta.pt",
     "hm_omega.pt", "hm_psi.pt",
-    "jf_sara.pt", "jm_nicola.pt",
-    "jf_alpha.pt", "jf_gongtsuene.pt", "jf_nezumi.pt", "jf_tebukuro.pt",
+    "jf_alpha.pt", "jf_nezumi.pt", "jf_tebukuro.pt",
     "jm_kumo.pt",
     "pf_dora.pt", "pm_alex.pt", "pm_santa.pt",
-    "zf_xiaobei.pt", "zf_xiaoni.pt", "zf_xiaoqiao.pt", "zf_xiaoyi.pt"
+    "zf_xiaobei.pt", "zf_xiaoni.pt", "zf_xiaoyi.pt"
 ]
 
 # Patch KPipeline's load_voice method to use weights_only=False
