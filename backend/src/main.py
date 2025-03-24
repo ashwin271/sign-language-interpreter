@@ -54,7 +54,7 @@ app.include_router(transcription_router, prefix="/transcribe")
 app.include_router(auth_router, prefix="/auth")
 app.include_router(video_gen_router, prefix="/video")
 app.include_router(text_speech_router)
-app.include_router(gesture_router)
+app.include_router(gesture_router, prefix="/gesture")
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore

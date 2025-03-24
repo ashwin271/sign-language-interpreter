@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
 openai-whisper
 python-multipart
 python-jose[cryptography]
@@ -11,3 +11,10 @@ moviepy
 ollama
 python-dotenv
 pydantic
+opencv-python
+mediapipe
+tensorflow
+numpy
+h5py
+scikit-learn
+websockets

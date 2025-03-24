@@ -4,7 +4,7 @@ from pathlib import Path
 from contextlib import contextmanager
 
 # Create database directory if it doesn't exist
-DB_DIR = Path("backend/data/db")
+DB_DIR = Path("data/db")
 DB_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database file path
