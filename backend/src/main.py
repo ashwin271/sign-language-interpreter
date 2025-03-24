@@ -43,16 +43,16 @@ app.add_middleware(
 app.mount("/assets/generated", StaticFiles(directory=str(GENERATED_DIR)), name="generated_videos")
 
 # Import routes
-from routes.translator import router as translator_router
+from routes.transcription import router as transcription_router
 from routes.video_gen import router as video_gen_router
 from routes.auth import router as auth_router
 from routes.tts import router as text_speech_router
 from routes.gesture_recognition import router as gesture_router
 
 # Include routers
-app.include_router(translator_router)
-app.include_router(auth_router)
-app.include_router(video_gen_router)
+app.include_router(transcription_router, prefix="/transcribe")
+app.include_router(auth_router, prefix="/auth")
+app.include_router(video_gen_router, prefix="/video")
 app.include_router(text_speech_router)
 app.include_router(gesture_router)
 

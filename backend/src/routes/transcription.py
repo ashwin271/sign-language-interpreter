@@ -8,7 +8,7 @@ router = APIRouter()
 # Load the Whisper model once when the application starts
 model = whisper.load_model("tiny")
 
-@router.post("/transcribe")
+@router.post("")
 async def transcribe_audio(file: UploadFile = File(...)):
     try:
         # Save the uploaded audio file temporarily

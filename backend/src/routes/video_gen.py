@@ -92,15 +92,16 @@ Available sign language words: {', '.join(available_words)}
 
 Follow these rules strictly:
 1. ONLY use words from the available list above
-2. Maintain the core meaning of the original text
-3. Preserve the essential information
-4. Keep the natural order of concepts when possible
-5. Remove articles (a, an, the), conjunctions (and, but, or), and prepositions (to, from, with) unless essential
-6. Remove auxiliary verbs (is, am, are, was, were) unless they're the main verb
+2. Maintain the core meaning of the original text as much as possible
+3. If exact words aren't available, find conceptually similar words from the available list
+4. If no similar words exist, it's better to skip that concept than to use an unrelated word
+5. NEVER substitute words with completely different meanings
+6. Keep the natural order of concepts when possible
 7. Focus on nouns, main verbs, adjectives, and adverbs that convey the key message
-8. If an exact word isn't available, find the closest alternative from the available words
-9. Output ONLY the final sequence of words separated by spaces, all lowercase
-10. Do not include any explanations, just the final word sequence
+8. Output ONLY the final sequence of words separated by spaces, all lowercase
+9. If you cannot find any appropriate words to convey the meaning, output "no_suitable_words_available"
+
+IMPORTANT: Do not completely change the meaning of the text. If you can't find suitable words, it's better to return fewer words or "no_suitable_words_available" than to use words with unrelated meanings.
 
 Original text: {text}
 Sign language word sequence:"""
@@ -110,6 +111,11 @@ Sign language word sequence:"""
         processed_text = response["message"]["content"].strip()
         # Remove any quotes or extra formatting that might be in the response
         processed_text = processed_text.replace('"', '').replace("'", "").strip()
+        
+        # Check for the special "no suitable words" response
+        if processed_text == "no_suitable_words_available":
+            logger.warning(f"No suitable words available for: '{text}'")
+            return ""
         
         # Verify that all words in the processed text are in the available words list
         processed_words = processed_text.split()
@@ -124,16 +130,15 @@ Sign language word sequence:"""
         final_text = " ".join(final_words)
         logger.info(f"Processed text: '{text}' -> '{final_text}'")
         
-        # If no valid words were found, fall back to basic processing
+        # If no valid words were found, return empty string
         if not final_words:
-            logger.warning("No valid words found in Llama output, falling back to basic matching")
-            return basic_text_processing(text, available_words)
+            logger.warning("No valid words found in Llama output")
+            return ""
             
         return final_text
     except Exception as e:
         logger.error(f"Error processing text with Llama: {e}")
-        # Fallback to basic processing if Llama fails
-        return basic_text_processing(text, available_words)
+        return ""
 
 def basic_text_processing(text: str, available_words: List[str]) -> str:
     """Basic text processing as fallback when Llama processing fails."""
@@ -226,7 +231,7 @@ def background_video_generation(text: str, content_hash: str) -> None:
     except Exception as e:
         logger.error(f"Error in background video generation: {e}")
 
-@router.post("/")
+@router.post("")
 async def generate_video(text: str, background_tasks: BackgroundTasks):
     """Generate an ISL video based on input text."""
     try:
@@ -248,6 +253,17 @@ async def generate_video(text: str, background_tasks: BackgroundTasks):
                     video_cache[content_hash] = f"/assets/generated/{filename}"
                     logger.info(f"Found existing video in metadata: {filename}")
                     return {"video_path": f"/assets/generated/{filename}", "cached": True}
+        
+        # Process the text first to check if we have suitable words
+        processed_text = process_text(text)
+        
+        # If no suitable words are available, return an error
+        if not processed_text:
+            return {
+                "status": "error",
+                "message": "No suitable sign language words available for this text. Try different wording.",
+                "content_hash": content_hash
+            }
         
         # Start background task for video generation
         background_tasks.add_task(background_video_generation, text, content_hash)

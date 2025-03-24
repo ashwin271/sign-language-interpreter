@@ -55,7 +55,7 @@ const TextToSign = () => {
     try {
       // Send text as a query parameter in the URL
       const encodedText = encodeURIComponent(text);
-      const response = await fetch(`${API_URL}/video/?text=${encodedText}`, {
+      const response = await fetch(`${API_URL}/video?text=${encodedText}`, {
         method: 'POST',
         headers: {
           'accept': 'application/json',
@@ -68,7 +68,10 @@ const TextToSign = () => {
       
       const data = await response.json();
       
-      if (data.status === 'processing') {
+      if (data.status === 'error') {
+        // No suitable words available
+        setError(data.message || 'No suitable sign language words available for this text. Try different wording.');
+      } else if (data.status === 'processing') {
         // Video is being generated in the background
         setContentHash(data.content_hash);
         setProcessingStatus('processing');
