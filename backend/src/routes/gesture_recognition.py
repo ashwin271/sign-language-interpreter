@@ -9,6 +9,17 @@ import os
 import time
 from typing import List, Dict, Optional
 
+# Configure TensorFlow to use less GPU memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Limit TensorFlow to only use a fraction of GPU memory
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print("GPU memory growth enabled")
+    except RuntimeError as e:
+        print(f"GPU configuration error: {e}")
+
 # Create router instead of app
 from fastapi import APIRouter
 
@@ -23,8 +34,24 @@ model_path = os.path.join(backend_dir, "model", "gesture_model.h5")
 label_map_path = os.path.join(backend_dir, "model", "gesture_label_map.npy")
 labels_path = os.path.join(backend_dir, "model", "gesture_labels.npy")
 
-# Load the model
-model = tf.keras.models.load_model(model_path)
+# Load the model and convert to TFLite
+print(f"Loading model from {model_path}")
+keras_model = tf.keras.models.load_model(model_path)
+
+# Convert model to TensorFlow Lite for better performance and lower memory usage
+converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_content=tflite_model)
+interpreter.allocate_tensors()
+
+# Get input and output tensors
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+print(f"Model loaded and converted to TFLite. Input shape: {input_details[0]['shape']}, Output shape: {output_details[0]['shape']}")
 
 # Load label map
 if os.path.exists(label_map_path):
@@ -108,10 +135,13 @@ async def process_video(video: UploadFile = File(...)):
                     if len(landmarks) != 42:
                         continue
                         
-                    landmarks = np.array(landmarks).reshape(1, -1)
+                    landmarks = np.array(landmarks).reshape(1, -1).astype(np.float32)
 
-                    # Get predictions
-                    prediction = model.predict(landmarks, verbose=0)
+                    # Get predictions using TFLite
+                    interpreter.set_tensor(input_details[0]['index'], landmarks)
+                    interpreter.invoke()
+                    prediction = interpreter.get_tensor(output_details[0]['index'])
+                    
                     gesture_id = int(np.argmax(prediction))
                     confidence = float(prediction[0][gesture_id])
                     
@@ -197,10 +227,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     if len(landmarks) != 42:
                         continue
                         
-                    landmarks = np.array(landmarks).reshape(1, -1)
+                    landmarks = np.array(landmarks).reshape(1, -1).astype(np.float32)
 
-                    # Get predictions
-                    prediction = model.predict(landmarks, verbose=0)
+                    # Get predictions using TFLite
+                    interpreter.set_tensor(input_details[0]['index'], landmarks)
+                    interpreter.invoke()
+                    prediction = interpreter.get_tensor(output_details[0]['index'])
+                    
                     gesture_id = int(np.argmax(prediction))
                     confidence = float(prediction[0][gesture_id])
                     
